@@ -1,0 +1,78 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.ServiceModel;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Xrm.Sdk;
+
+namespace testing_1st_plugin
+{
+    public class my1StPlugin : IPlugin
+    {
+        public void Execute(IServiceProvider serviceProvider)
+        {
+            // Obtain the tracing service
+            ITracingService tracingService =
+                (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+
+            // Obtain the execution context from the service provider.  
+            IPluginExecutionContext context = (IPluginExecutionContext)
+                serviceProvider.GetService(typeof(IPluginExecutionContext));
+
+            // The InputParameters collection contains all the data passed in the message request.  
+            if (context.InputParameters.Contains("Target") &&
+                context.InputParameters["Target"] is Entity)
+            {
+                // Obtain the target entity from the input parameters.  
+                Entity contact = (Entity)context.InputParameters["Target"];
+
+                // Obtain the organization service reference which you will need for  
+                // web service calls.  
+                IOrganizationServiceFactory serviceFactory =
+                    (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
+                IOrganizationService service = serviceFactory.CreateOrganizationService(context.UserId);
+
+                try
+                {
+                    // creating a in memory Object and passing a schama name of the entity.
+                    Entity taskRecord=new Entity("task");
+
+                    //setting a single line of text
+                    taskRecord.Attributes.Add("subject","fallow up");
+                    taskRecord.Attributes.Add("description", "please fallow up with contact");
+
+                    // setting a Date
+                    taskRecord.Attributes.Add("scheduledend", DateTime.Now.AddDays(2));
+
+
+                    // Adding a OptionSet values 
+                    taskRecord.Attributes.Add("prioritycode", new OptionSetValue(2));
+
+                    // set perant record value or look up field, you have to provide the field logical name and 
+                    // since its look up you have to submit the refarance to the perant entity as a GUID
+
+                    //taskRecord.Attributes.Add("regardingobjectid", new EntityReference("contcat", contact.Id));
+                    taskRecord.Attributes.Add("regardingobjectid", contact.ToEntityReference());
+
+
+                    Guid taskGuid =service.Create(taskRecord);
+
+
+                }
+
+                catch (FaultException<OrganizationServiceFault> ex)
+                {
+                    throw new InvalidPluginExecutionException("An error occurred in FollowUpPlugin.", ex);
+                }
+
+                catch (Exception ex)
+                {
+                    tracingService.Trace("FollowUpPlugin: {0}", ex.ToString());
+                    throw;
+                }
+            }
+        }
+    }
+}
+//
